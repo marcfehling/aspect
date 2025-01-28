@@ -1,0 +1,104 @@
+# The model represents an icy moon subject to tidal forcing (time-dependent gravity).
+# The model is 2D spherical with outer free surface and mesh deformation.
+# If we neglect deformation of the outer surface (remove the Mesh deformation subsection), oscillations disappear.
+# (The thermal part of the problem is unimportant in this example.)
+
+set Dimension                                = 2
+set Use years in output instead of seconds   = false
+set Output directory                         = output
+
+set Maximum time step                        = 5e3
+set End time                                 = 1e5
+
+subsection Geometry model
+  set Model name = spherical shell
+  subsection Spherical shell
+    set Inner radius  = 150e3
+    set Outer radius  = 250e3
+    set Opening angle = 360
+  end
+end
+
+subsection Mesh deformation
+  set Mesh deformation boundary indicators = outer: free surface
+  subsection Free surface
+    set Free surface stabilization theta = 0.5
+    set Surface velocity projection = vertical
+  end
+end
+
+set Pressure normalization = no
+
+subsection Boundary velocity model
+  set Zero velocity boundary indicators = inner
+end
+
+subsection Initial temperature model
+  set List of model names   = function
+  subsection Function
+    set Coordinate system   = spherical
+    set Variable names      = r,phi
+    set Function constants  = r0=150e3, r1=250e3, T0=200, T1=80
+    set Function expression = T0+(r-r0)/(r1-r0)*(T1-T0)
+  end
+end
+set Adiabatic surface temperature = 100.0
+
+subsection Boundary temperature model
+  set Fixed temperature boundary indicators = inner, outer
+  set List of model names = initial temperature
+end
+
+subsection Heating model
+  set List of model names =  shear heating
+end
+
+subsection Gravity model
+  set Model name = function
+  subsection Function
+    set Variable names = x,y,time
+    # We prescribe a combination of gravity and tidal forces,
+    #tidesx="6.0*omega*omega*ecc*(y*sin(omega*time)+x*cos(omega*time))"
+    #tidesy="3.0*omega*omega*ecc*(2*x*sin(omega*time)-y*cos(omega*time))"
+    set Function constants = gm=0.113, omega=7.35e-5, gt=2.5e-11 # =omega^2*ecc; ecc=0.0047; orbital period T=85502 s, omega=2*pi/T
+    set Function expression = (x>0 ? -gm/sqrt(1+(y/x)^2) : 0)+(x<0 ? gm/sqrt(1+(y/x)^2) : 0) \
+                              +6*gt*(y*sin(omega*time)+x*cos(omega*time)); \
+                              (y>0 ? -gm/sqrt(1+(x/y)^2) : 0)+(y<0 ? gm/sqrt(1+(x/y)^2) : 0) \
+                              +3*gt*(2*x*sin(omega*time)-y*cos(omega*time))
+  end
+end
+
+subsection Material model
+  set Model name = simple
+  subsection Simple model
+    set Reference density = 1000.0
+    set Reference specific heat = 1250.
+    set Thermal expansion coefficient = 0.0
+    set Viscosity = 1e14
+  end
+end
+
+subsection Mesh refinement
+  set Initial global refinement                = 3
+  set Initial adaptive refinement              = 1
+  #Without adaptive refinement (uncomment the following two lines), oscillations disappear:
+  #set Initial global refinement                = 4
+  #set Initial adaptive refinement              = 0
+  set Minimum refinement level                 = 3
+  set Time steps between mesh refinement       = 0
+  set Strategy                                 = boundary
+  subsection Boundary
+    set Boundary refinement indicators = inner
+  end
+end
+
+subsection Postprocess
+  set List of postprocessors = velocity statistics, heat flux statistics, heating statistics, visualization
+  subsection Visualization
+    set Time between graphical output    = 1e4
+    set List of output variables = material properties, strain rate, heating, gravity
+    set Output mesh velocity = true
+    set Interpolate output = false
+  end
+end
+
